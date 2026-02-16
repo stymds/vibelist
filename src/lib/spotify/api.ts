@@ -4,6 +4,48 @@ import type { TrackInfo } from "@/types/database";
 
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
+export class SpotifyAccessError extends Error {
+  statusCode: number;
+  constructor(message: string, statusCode: number = 403) {
+    super(message);
+    this.name = "SpotifyAccessError";
+    this.statusCode = statusCode;
+  }
+}
+
+export async function validateSpotifyAccess(userId: string): Promise<string> {
+  let accessToken: string;
+  try {
+    accessToken = await getValidAccessToken(userId);
+  } catch {
+    throw new SpotifyAccessError(
+      "Your Spotify access has been revoked. Please contact the developer for access.",
+      403
+    );
+  }
+
+  // Ping /v1/me to verify the token actually works
+  const response = await fetch(`${SPOTIFY_API_BASE}/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    throw new SpotifyAccessError(
+      "Your Spotify access has been revoked. Please contact the developer for access.",
+      response.status
+    );
+  }
+
+  if (!response.ok) {
+    throw new SpotifyAccessError(
+      "Failed to verify Spotify access. Please try again.",
+      response.status
+    );
+  }
+
+  return accessToken;
+}
+
 export async function getValidAccessToken(userId: string): Promise<string> {
   const admin = createAdminClient();
   const { data: user, error } = await admin
@@ -80,6 +122,7 @@ export async function searchTrack(
     `${SPOTIFY_API_BASE}/search?q=${exactQuery}&type=track&limit=1`,
     accessToken
   );
+  if (!response.ok) return null;
   let data = await response.json();
 
   if (data.tracks?.items?.length > 0) {
@@ -97,6 +140,7 @@ export async function searchTrack(
     `${SPOTIFY_API_BASE}/search?q=${looseQuery}&type=track&limit=1`,
     accessToken
   );
+  if (!response.ok) return null;
   data = await response.json();
 
   if (data.tracks?.items?.length > 0) {
@@ -114,6 +158,7 @@ export async function searchTrack(
     `${SPOTIFY_API_BASE}/search?q=${titleQuery}&type=track&limit=1`,
     accessToken
   );
+  if (!response.ok) return null;
   data = await response.json();
 
   if (data.tracks?.items?.length > 0) {

@@ -14,6 +14,13 @@ import { PlaylistResult } from "@/components/playlist-result";
 import { toast } from "sonner";
 import { CREDITS, SONG_COUNT, INPUT_LIMITS } from "@/lib/constants";
 import type { CreateFlowState, CreateFlowStep } from "@/types/playlist";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Camera, Upload, X } from "lucide-react";
 
 interface CreateFormProps {
@@ -56,6 +63,7 @@ const initialState: CreateFlowState = {
   is_public: true,
   regeneration_used: false,
   error: null,
+  error_type: null,
 };
 
 export function CreateForm({
@@ -74,6 +82,13 @@ export function CreateForm({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setState(initialState);
+      setImageError(null);
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     setPlaceholderPair(pickRandomPair());
@@ -215,6 +230,14 @@ export function CreateForm({
 
       if (!response.ok) {
         const data = await response.json();
+        if (data.error_type === "spotify_access_revoked") {
+          updateState({
+            step: "error",
+            error: data.error,
+            error_type: "spotify_access_revoked",
+          });
+          return;
+        }
         throw new Error(data.error || "Failed to generate playlist");
       }
 
@@ -268,6 +291,14 @@ export function CreateForm({
 
       if (!response.ok) {
         const data = await response.json();
+        if (data.error_type === "spotify_access_revoked") {
+          updateState({
+            step: "error",
+            error: data.error,
+            error_type: "spotify_access_revoked",
+          });
+          return;
+        }
         throw new Error(data.error || "Failed to regenerate");
       }
 
@@ -311,6 +342,14 @@ export function CreateForm({
 
       if (!response.ok) {
         const data = await response.json();
+        if (data.error_type === "spotify_access_revoked") {
+          updateState({
+            step: "error",
+            error: data.error,
+            error_type: "spotify_access_revoked",
+          });
+          return;
+        }
         throw new Error(data.error || "Failed to create playlist");
       }
 
@@ -355,7 +394,7 @@ export function CreateForm({
   // GENERATING STATE
   if (state.step === "generating" || state.step === "creating_playlist") {
     return (
-      <div className="w-full max-w-2xl mx-auto rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] p-8">
+      <div className="w-full max-w-2xl mx-auto">
         <GenerationLoader />
       </div>
     );
@@ -401,9 +440,16 @@ export function CreateForm({
     return (
       <div className="w-full max-w-2xl mx-auto rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] p-8 text-center space-y-4">
         <p className="text-destructive">{state.error || "Something went wrong"}</p>
-        <Button variant="outline" onClick={handleReset} className="cursor-pointer">
-          Try Again
-        </Button>
+        <div className="flex items-center justify-center gap-4 pt-2">
+          {state.error_type === "spotify_access_revoked" && (
+            <Button asChild className="rounded-full bg-gradient-to-r from-[var(--neon-purple)] to-[#2979FF] text-white font-semibold hover:shadow-[0_0_20px_rgba(176,38,255,0.4)] transition-all duration-200">
+              <a href="mailto:satyamdas020399@gmail.com">Request Access</a>
+            </Button>
+          )}
+          <Button variant="outline" onClick={handleReset} className="rounded-full cursor-pointer">
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }
@@ -450,7 +496,7 @@ export function CreateForm({
         !isInputValid ||
         (isAuthenticated && !hasEnoughCredits)
       }
-      className="flex-shrink-0 bg-gradient-to-r from-[var(--neon-purple)] to-[#2979FF] hover:shadow-[0_0_20px_rgba(176,38,255,0.4)] text-white font-semibold px-5 rounded-xl cursor-pointer transition-all duration-200 disabled:opacity-50"
+      className="flex-shrink-0 h-10 bg-gradient-to-r from-[var(--neon-purple)] to-[#2979FF] hover:shadow-[0_0_20px_rgba(176,38,255,0.4)] text-white font-semibold px-5 rounded-xl cursor-pointer transition-all duration-200 disabled:opacity-50"
     >
       {!isAuthenticated
         ? "Sign in"
@@ -520,22 +566,6 @@ export function CreateForm({
             )}
           </div>
 
-          {/* Mobile vertical slider (no border divider) */}
-          <div className="flex md:hidden flex-col items-center gap-2 pl-3 ml-3">
-            <span className="text-xs text-muted-foreground">Songs</span>
-            <Slider
-              value={[state.track_count]}
-              onValueChange={([value]) => updateState({ track_count: value })}
-              min={SONG_COUNT.MIN}
-              max={SONG_COUNT.MAX}
-              step={1}
-              orientation="vertical"
-              className="min-h-24 flex-1"
-            />
-            <span className="text-sm font-mono text-[var(--neon-green)]">
-              {state.track_count}
-            </span>
-          </div>
         </div>
 
         {/* Desktop bottom controls (no border-t divider) */}
@@ -589,6 +619,30 @@ export function CreateForm({
               {photoPopoverContent(() => setMobilePopoverOpen(false))}
             </PopoverContent>
           </Popover>
+
+          <Select
+            value={String(state.track_count)}
+            onValueChange={(val) => updateState({ track_count: Number(val) })}
+          >
+            <SelectTrigger
+              onClick={(e) => e.stopPropagation()}
+              className="w-auto !h-10 gap-1.5 px-3 rounded-xl bg-white/[0.06] border border-white/10 text-sm cursor-pointer"
+            >
+              <span className="text-muted-foreground">Songs</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent onClick={(e) => e.stopPropagation()}>
+              {Array.from(
+                { length: SONG_COUNT.MAX - SONG_COUNT.MIN + 1 },
+                (_, i) => SONG_COUNT.MIN + i
+              ).map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {n}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {createButton}
         </div>
 

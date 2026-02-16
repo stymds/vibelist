@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generatePlaylist } from "@/lib/openai/prompts";
-import { searchTrack, getValidAccessToken } from "@/lib/spotify/api";
+import { searchTrack, validateSpotifyAccess, SpotifyAccessError } from "@/lib/spotify/api";
 import { regenerateSchema } from "@/lib/validations";
 import { CREDITS } from "@/lib/constants";
 import type { TrackInfo } from "@/types/database";
@@ -74,6 +74,9 @@ export async function POST(
   }
 
   try {
+    // Validate Spotify access before any costly operations
+    const accessToken = await validateSpotifyAccess(user.id);
+
     // Parse stored image URLs (JSONB array or null)
     const imageUrls: string[] = Array.isArray(playlist.input_image_urls)
       ? playlist.input_image_urls
@@ -88,7 +91,6 @@ export async function POST(
     );
 
     // Search Spotify
-    const accessToken = await getValidAccessToken(user.id);
     const foundTracks: TrackInfo[] = [];
     const seenIds = new Set<string>();
     let lastArtist = "";
@@ -150,6 +152,12 @@ export async function POST(
       was_free: wasFree,
     });
   } catch (err) {
+    if (err instanceof SpotifyAccessError) {
+      return NextResponse.json(
+        { error: err.message, error_type: "spotify_access_revoked" },
+        { status: err.statusCode }
+      );
+    }
     console.error("Regenerate error:", err);
     return NextResponse.json(
       { error: "Something went wrong" },

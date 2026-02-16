@@ -50,6 +50,7 @@ export interface CreateFlowState {
   is_public: boolean;
   regeneration_used: boolean;
   error: string | null;
+  error_type?: string | null;
 }
 
 export interface AiAnalysisResult {

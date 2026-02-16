@@ -3,6 +3,7 @@ import { Footer } from "@/components/footer";
 import { createClient } from "@/lib/supabase/server";
 import { CREDITS } from "@/lib/constants";
 import { HomeContent } from "@/components/home-content";
+import { Equalizer } from "@/components/equalizer";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -30,9 +31,10 @@ export default async function Home() {
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
         <div className="w-full max-w-2xl mx-auto space-y-8">
           <div className="text-center space-y-3">
-            <p className="brand-glow font-bold text-lg sm:text-3xl tracking-widest">
+            <span className="brand-glow font-bold text-lg sm:text-3xl tracking-widest inline-flex items-center gap-2">
+              <Equalizer bars={4} />
               VibeList AI
-            </p>
+            </span>
             <h1 className="text-4xl sm:text-4xl font-bold tracking-tight">
               Turn your vibe into a Spotify playlist
             </h1>

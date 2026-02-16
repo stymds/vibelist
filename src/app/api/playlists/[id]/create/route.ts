@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  getValidAccessToken,
+  validateSpotifyAccess,
+  SpotifyAccessError,
   createSpotifyPlaylist,
   addTracksToPlaylist,
 } from "@/lib/spotify/api";
@@ -58,7 +59,7 @@ export async function POST(
       // No body or invalid JSON — use playlist default
     }
 
-    const accessToken = await getValidAccessToken(user.id);
+    const accessToken = await validateSpotifyAccess(user.id);
 
     // Create playlist on Spotify
     const spotifyPlaylist = await createSpotifyPlaylist(
@@ -92,6 +93,12 @@ export async function POST(
       spotify_playlist_url: spotifyPlaylist.url,
     });
   } catch (err) {
+    if (err instanceof SpotifyAccessError) {
+      return NextResponse.json(
+        { error: err.message, error_type: "spotify_access_revoked" },
+        { status: err.statusCode }
+      );
+    }
     console.error("Create playlist error:", err);
     return NextResponse.json(
       { error: "Failed to create playlist on Spotify" },

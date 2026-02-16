@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generatePlaylist } from "@/lib/openai/prompts";
-import { searchTrack, getValidAccessToken } from "@/lib/spotify/api";
+import { searchTrack, validateSpotifyAccess, SpotifyAccessError } from "@/lib/spotify/api";
 import { getRatelimit } from "@/lib/rate-limit";
 import { CREDITS, INPUT_LIMITS, SONG_COUNT } from "@/lib/constants";
 import type { TrackInfo } from "@/types/database";
@@ -114,6 +114,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate Spotify access before any costly operations
+    const accessToken = await validateSpotifyAccess(user.id);
+
     // Upload images to Supabase Storage
     const inputImageUrls: string[] = [];
     for (const imageFile of imageFiles) {
@@ -189,7 +192,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Search Spotify for each candidate
-    const accessToken = await getValidAccessToken(user.id);
     const foundTracks: TrackInfo[] = [];
     const seenIds = new Set<string>();
     let lastArtist = "";
@@ -246,6 +248,12 @@ export async function POST(request: NextRequest) {
       credits_remaining: newBalance,
     });
   } catch (err) {
+    if (err instanceof SpotifyAccessError) {
+      return NextResponse.json(
+        { error: err.message, error_type: "spotify_access_revoked" },
+        { status: err.statusCode }
+      );
+    }
     console.error("Generate error:", err);
     return NextResponse.json(
       { error: "Something went wrong" },

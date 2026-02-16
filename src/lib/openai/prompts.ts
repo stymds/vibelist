@@ -62,6 +62,7 @@ export async function generatePlaylist(
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: hasImages ? content : userPrompt },
     ],
+    response_format: { type: "json_object" },
     temperature: 0.9,
     max_tokens: 2000,
   });
@@ -71,5 +72,16 @@ export async function generatePlaylist(
     throw new Error("No response from AI");
   }
 
-  return JSON.parse(responseContent) as AiAnalysisResult;
+  // Strip markdown code fences if present
+  const cleaned = responseContent
+    .replace(/^```(?:json)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned) as AiAnalysisResult;
+  } catch {
+    console.error("Failed to parse AI response:", responseContent);
+    throw new Error("AI returned invalid response. Please try again.");
+  }
 }
