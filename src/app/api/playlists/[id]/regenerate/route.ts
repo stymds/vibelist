@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generatePlaylist } from "@/lib/openai/prompts";
-import { searchTrack, validateSpotifyAccess, SpotifyAccessError } from "@/lib/spotify/api";
+import { searchTracksInBatches, validateSpotifyAccess, SpotifyAccessError } from "@/lib/spotify/api";
 import { regenerateSchema } from "@/lib/validations";
 import { CREDITS } from "@/lib/constants";
-import type { TrackInfo } from "@/types/database";
 
 export async function POST(
   request: NextRequest,
@@ -90,24 +89,12 @@ export async function POST(
       exclude_tracks
     );
 
-    // Search Spotify
-    const foundTracks: TrackInfo[] = [];
-    const seenIds = new Set<string>();
-    let lastArtist = "";
-
-    for (const song of aiResult.songs) {
-      if (foundTracks.length >= playlist.track_count) break;
-
-      const track = await searchTrack(song.title, song.artist, accessToken);
-      if (!track) continue;
-
-      if (seenIds.has(track.spotify_track_id)) continue;
-      if (track.artist === lastArtist) continue;
-
-      seenIds.add(track.spotify_track_id);
-      foundTracks.push(track);
-      lastArtist = track.artist;
-    }
+    // Search Spotify (batched for performance)
+    const foundTracks = await searchTracksInBatches(
+      aiResult.songs,
+      playlist.track_count,
+      accessToken
+    );
 
     // Deduct credits if not free
     let newBalance = 0;

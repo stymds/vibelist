@@ -1,6 +1,8 @@
 -- VibeList Phase 1 Database Migration
 -- Run this in Supabase SQL Editor
 
+BEGIN;
+
 -- Create custom enums
 CREATE TYPE input_type_enum AS ENUM ('text', 'image');
 CREATE TYPE playlist_status_enum AS ENUM ('generating', 'song_list', 'created', 'failed');
@@ -123,3 +125,5 @@ UPDATE playlists
 
 -- Drop old column (only run after verifying migration)
 ALTER TABLE playlists DROP COLUMN IF EXISTS input_image_url;
+
+COMMIT;

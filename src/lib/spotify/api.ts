@@ -14,36 +14,14 @@ export class SpotifyAccessError extends Error {
 }
 
 export async function validateSpotifyAccess(userId: string): Promise<string> {
-  let accessToken: string;
   try {
-    accessToken = await getValidAccessToken(userId);
+    return await getValidAccessToken(userId);
   } catch {
     throw new SpotifyAccessError(
       "Your Spotify access has been revoked. Please contact the developer for access.",
       403
     );
   }
-
-  // Ping /v1/me to verify the token actually works
-  const response = await fetch(`${SPOTIFY_API_BASE}/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  if (response.status === 401 || response.status === 403) {
-    throw new SpotifyAccessError(
-      "Your Spotify access has been revoked. Please contact the developer for access.",
-      response.status
-    );
-  }
-
-  if (!response.ok) {
-    throw new SpotifyAccessError(
-      "Failed to verify Spotify access. Please try again.",
-      response.status
-    );
-  }
-
-  return accessToken;
 }
 
 export async function getValidAccessToken(userId: string): Promise<string> {
@@ -69,6 +47,9 @@ export async function getValidAccessToken(userId: string): Promise<string> {
   }
 
   // Token expired or about to expire — refresh
+  if (!user.spotify_refresh_token) {
+    throw new Error("No refresh token available");
+  }
   const tokens = await refreshAccessToken(user.spotify_refresh_token);
   const newExpiresAt = new Date(
     Date.now() + tokens.expires_in * 1000
@@ -86,10 +67,13 @@ export async function getValidAccessToken(userId: string): Promise<string> {
   return tokens.access_token;
 }
 
+const MAX_RETRIES = 3;
+
 async function spotifyFetch(
   url: string,
   accessToken: string,
-  options?: RequestInit
+  options?: RequestInit,
+  retries: number = 0
 ): Promise<Response> {
   const response = await fetch(url, {
     ...options,
@@ -101,9 +85,12 @@ async function spotifyFetch(
   });
 
   if (response.status === 429) {
+    if (retries >= MAX_RETRIES) {
+      return response;
+    }
     const retryAfter = parseInt(response.headers.get("Retry-After") || "2", 10);
     await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
-    return spotifyFetch(url, accessToken, options);
+    return spotifyFetch(url, accessToken, options, retries + 1);
   }
 
   return response;
@@ -171,6 +158,42 @@ export async function searchTrack(
   }
 
   return null;
+}
+
+const BATCH_SIZE = 5;
+
+export async function searchTracksInBatches(
+  songs: { title: string; artist: string }[],
+  targetCount: number,
+  accessToken: string
+): Promise<TrackInfo[]> {
+  const foundTracks: TrackInfo[] = [];
+  const seenIds = new Set<string>();
+  let lastArtist = "";
+
+  for (let i = 0; i < songs.length; i += BATCH_SIZE) {
+    if (foundTracks.length >= targetCount) break;
+
+    const batch = songs.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map((song) => searchTrack(song.title, song.artist, accessToken))
+    );
+
+    for (const result of results) {
+      if (foundTracks.length >= targetCount) break;
+      if (result.status !== "fulfilled" || !result.value) continue;
+
+      const track = result.value;
+      if (seenIds.has(track.spotify_track_id)) continue;
+      if (track.artist === lastArtist) continue;
+
+      seenIds.add(track.spotify_track_id);
+      foundTracks.push(track);
+      lastArtist = track.artist;
+    }
+  }
+
+  return foundTracks;
 }
 
 export async function createSpotifyPlaylist(

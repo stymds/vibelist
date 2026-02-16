@@ -2,16 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ROUTES } from "@/lib/constants";
 
 export function NavbarLogo() {
   const pathname = usePathname();
+  const router = useRouter();
 
   function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
     if (pathname === ROUTES.HOME) {
       e.preventDefault();
-      window.location.href = ROUTES.HOME;
+      router.refresh();
     }
   }
 

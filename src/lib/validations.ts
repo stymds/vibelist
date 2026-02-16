@@ -32,10 +32,10 @@ export const generateSchema = z.discriminatedUnion("input_type", [
 export const regenerateSchema = z.object({
   exclude_tracks: z.array(
     z.object({
-      title: z.string(),
-      artist: z.string(),
+      title: z.string().max(200),
+      artist: z.string().max(200),
     })
-  ),
+  ).max(50),
 });
 
 export const visibilitySchema = z.object({

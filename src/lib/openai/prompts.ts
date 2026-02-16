@@ -40,8 +40,9 @@ export async function generatePlaylist(
   }
 
   if (excludeTracks && excludeTracks.length > 0) {
+    const sanitize = (s: string) => s.replace(/[\n\r\t\x00-\x1f]/g, " ").trim();
     const exclusionList = excludeTracks
-      .map((t) => `"${t.title}" by ${t.artist}`)
+      .map((t) => `"${sanitize(t.title)}" by ${sanitize(t.artist)}`)
       .join(", ");
     userPrompt += `\n\nIMPORTANT: Do NOT include any of these songs: ${exclusionList}. Generate completely different songs.`;
   }

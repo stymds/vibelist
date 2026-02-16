@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generatePlaylist } from "@/lib/openai/prompts";
-import { searchTrack, validateSpotifyAccess, SpotifyAccessError } from "@/lib/spotify/api";
+import { searchTracksInBatches, validateSpotifyAccess, SpotifyAccessError } from "@/lib/spotify/api";
 import { getRatelimit } from "@/lib/rate-limit";
 import { CREDITS, INPUT_LIMITS, SONG_COUNT } from "@/lib/constants";
-import type { TrackInfo } from "@/types/database";
 
 export async function POST(request: NextRequest) {
   // Auth check
@@ -191,27 +190,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Search Spotify for each candidate
-    const foundTracks: TrackInfo[] = [];
-    const seenIds = new Set<string>();
-    let lastArtist = "";
-
-    for (const song of aiResult.songs) {
-      if (foundTracks.length >= trackCount) break;
-
-      const track = await searchTrack(song.title, song.artist, accessToken);
-      if (!track) continue;
-
-      // Deduplicate
-      if (seenIds.has(track.spotify_track_id)) continue;
-
-      // No same artist twice in a row
-      if (track.artist === lastArtist) continue;
-
-      seenIds.add(track.spotify_track_id);
-      foundTracks.push(track);
-      lastArtist = track.artist;
-    }
+    // Search Spotify for each candidate (batched for performance)
+    const foundTracks = await searchTracksInBatches(
+      aiResult.songs,
+      trackCount,
+      accessToken
+    );
 
     // Deduct credits atomically
     const { data: newBalance } = await admin.rpc("deduct_credits", {
