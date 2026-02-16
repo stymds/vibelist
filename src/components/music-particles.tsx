@@ -29,7 +29,7 @@ function getParticleStyle(index: number) {
 export function MusicParticles() {
   return (
     <div
-      className="fixed inset-0 pointer-events-none z-[1] hidden md:block overflow-hidden"
+      className="fixed inset-0 pointer-events-none z-[1] overflow-hidden"
       aria-hidden="true"
     >
       {Array.from({ length: PARTICLE_COUNT }, (_, i) => (
