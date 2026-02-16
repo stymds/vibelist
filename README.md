@@ -1,23 +1,15 @@
-<![CDATA[<div align="center">
-  <img src="public/logo/logo.png" alt="VibeList Logo" width="80" />
-  <h1>VibeList</h1>
-  <p><strong>Describe a vibe. Get a Spotify playlist.</strong></p>
+# VibeList
 
-  <p>
-    <a href="https://vibelist.satyamdas.site">Live App</a> ·
-    <a href="https://satyamdas.site">Portfolio</a> ·
-    <a href="#getting-started">Getting Started</a>
-  </p>
+**Describe a vibe. Get a Spotify playlist.**
 
-  <p>
-    <img src="https://img.shields.io/badge/Next.js-16-black?logo=next.js" alt="Next.js" />
-    <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react" alt="React" />
-    <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript" alt="TypeScript" />
-    <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss" alt="Tailwind" />
-    <img src="https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase" alt="Supabase" />
-    <img src="https://img.shields.io/badge/OpenAI-GPT--4o-412991?logo=openai" alt="OpenAI" />
-  </p>
-</div>
+[Live App](https://vibelist.satyamdas.site) · [Portfolio](https://satyamdas.site) · [Getting Started](#getting-started)
+
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)
+![Tailwind](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase)
+![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o-412991?logo=openai)
 
 ---
 
@@ -113,36 +105,34 @@ User can: Create on Spotify / Regenerate / Toggle visibility
 
 ### Database Schema
 
-```sql
-users
-  id                       UUID  PK (references auth.users)
-  spotify_id               TEXT  UNIQUE
-  email                    TEXT
-  display_name             TEXT
-  avatar_url               TEXT
-  spotify_access_token     TEXT
-  spotify_refresh_token    TEXT
-  spotify_token_expires_at TIMESTAMPTZ
-  credits_remaining        INT   DEFAULT 5
-  created_at / updated_at  TIMESTAMPTZ
+**users table:**
+- `id` (UUID, PK, references auth.users)
+- `spotify_id` (TEXT, UNIQUE)
+- `email` (TEXT)
+- `display_name` (TEXT)
+- `avatar_url` (TEXT)
+- `spotify_access_token` (TEXT)
+- `spotify_refresh_token` (TEXT)
+- `spotify_token_expires_at` (TIMESTAMPTZ)
+- `credits_remaining` (INT, DEFAULT 5)
+- `created_at`, `updated_at` (TIMESTAMPTZ)
 
-playlists
-  id                    UUID  PK
-  user_id               UUID  FK → users
-  spotify_playlist_id   TEXT
-  spotify_playlist_url  TEXT
-  name                  TEXT
-  input_type            ENUM  ('text' | 'image')
-  input_text            TEXT
-  input_image_urls      JSONB
-  track_count           INT
-  tracks                JSONB  -- Array of { title, artist, spotify_track_id }
-  is_public             BOOLEAN
-  regeneration_used     BOOLEAN
-  credits_charged       INT
-  status                ENUM  ('generating' | 'song_list' | 'created' | 'failed')
-  created_at            TIMESTAMPTZ
-```
+**playlists table:**
+- `id` (UUID, PK)
+- `user_id` (UUID, FK → users)
+- `spotify_playlist_id` (TEXT)
+- `spotify_playlist_url` (TEXT)
+- `name` (TEXT)
+- `input_type` (ENUM: 'text' | 'image')
+- `input_text` (TEXT)
+- `input_image_urls` (JSONB)
+- `track_count` (INT)
+- `tracks` (JSONB) — Array of `{ title, artist, spotify_track_id }`
+- `is_public` (BOOLEAN)
+- `regeneration_used` (BOOLEAN)
+- `credits_charged` (INT)
+- `status` (ENUM: 'generating' | 'song_list' | 'created' | 'failed')
+- `created_at` (TIMESTAMPTZ)
 
 Row Level Security is enabled on both tables. All server-side mutations use the admin client (bypasses RLS); all client-facing reads go through the user's session (RLS enforced).
 
@@ -294,16 +284,20 @@ The app is deployed on **Vercel** with the backend on **Supabase**.
 
 ## Design Decisions
 
-**Why manual Spotify OAuth instead of Supabase's built-in provider?**
+### Why manual Spotify OAuth instead of Supabase's built-in provider?
+
 Supabase's OAuth provider doesn't expose Spotify's `refresh_token` for storing and using later. Since VibeList needs to call the Spotify API on behalf of users (to create playlists) — not just authenticate them — full token ownership is required.
 
-**Why a deterministic password for Supabase Auth?**
+### Why a deterministic password for Supabase Auth?
+
 Supabase Auth is used solely to establish a session so RLS policies work. Since users never set a password (Spotify is the only login method), an HMAC-SHA256 hash of the Spotify ID is generated server-side as a stable, reproducible credential.
 
-**Why `Promise.allSettled` for track searches?**
+### Why `Promise.allSettled` for track searches?
+
 Individual Spotify search failures (429, network error) shouldn't abort the entire playlist. Batches of 5 are fired in parallel; fulfilled results are collected, rejected ones are silently skipped. This is both faster and more resilient than sequential iteration.
 
-**Why Upstash Redis for rate limiting?**
+### Why Upstash Redis for rate limiting?
+
 Vercel's serverless/edge functions are stateless. An in-memory rate limiter would reset on every cold start. Upstash provides a persistent, low-latency Redis instance that works correctly across all function instances.
 
 ---
@@ -314,7 +308,4 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
-<div align="center">
-  Built by <a href="https://satyamdas.site">Satyam Das</a>
-</div>
-]]>
+Built by [Satyam Das](https://satyamdas.site)
